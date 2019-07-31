@@ -1,0 +1,15 @@
+FROM keboola/docker-amazonlinux-php:latest
+
+ENV COMPOSER_ALLOW_SUPERUSER 1
+
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin/ --filename=composer
+
+RUN composer global require hirak/prestissimo
+
+WORKDIR /code
+
+COPY . .
+
+RUN composer install $COMPOSER_FLAGS
+
+CMD composer ci

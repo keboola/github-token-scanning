@@ -1,0 +1,47 @@
+sudo: required
+language: bash
+services:
+  - docker
+
+script:
+  # unit & functional tests
+  - >-
+    docker-compose run --rm
+    -e AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID}
+    -e AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY}
+    -e REGION=${TEST_REGION}
+    -e STORAGE_API_URL=${TEST_STORAGE_API_URL}
+    -e STORAGE_API_TOKEN=${TEST_STORAGE_API_TOKEN}
+    -e KMS_KEY_ALIAS=${TEST_KMS_KEY_ALIAS}
+    tests
+
+  # deploy to testing
+  - >-
+    docker-compose run --rm
+    -e AWS_ACCESS_KEY_ID=${DEPLOY_AWS_ACCESS_KEY_ID}
+    -e AWS_SECRET_ACCESS_KEY=${DEPLOY_AWS_SECRET_ACCESS_KEY}
+    -e REGION=${TEST_REGION}
+    -e SERVICE_NAME=${TEST_SERVICE_NAME}
+    -e STAGE=dev
+    -e KEBOOLA_STACK=${TEST_KEBOOLA_STACK}
+    -e CLOUDFORMATION_ROLE_ARN=${TEST_CLOUDFORMATION_ROLE_ARN}
+    -e LAMBDA_EXECUTION_ROLE_ARN=${TEST_LAMBDA_EXECUTION_ROLE_ARN}
+    -e VPC_SECURITY_GROUP=${TEST_VPC_SECURITY_GROUP}
+    -e VPC_SUBNET1=${TEST_VPC_SUBNET1}
+    -e VPC_SUBNET2=${TEST_VPC_SUBNET2}
+    -e VPC_ID=${TEST_VPC_ID}
+    -e PHP_RUNTIME_LAYER=${PHP_RUNTIME_LAYER}
+    -e INTERNAL_API_URL=${TEST_INTERNAL_API_URL}
+    -e STORAGE_API_URL=${TEST_STORAGE_API_URL}
+    -e STORAGE_API_TOKEN=${TEST_STORAGE_API_TOKEN}
+    -e KMS_KEY_ALIAS=${TEST_KMS_KEY_ALIAS}
+    deploy
+
+# Deploy to production
+deploy:
+  provider: script
+  skip_cleanup: true
+  script: ./deploy.sh
+  on:
+    branch: master
+    tags: true

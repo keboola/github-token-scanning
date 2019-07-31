@@ -1,0 +1,105 @@
+service: "${env:KEBOOLA_STACK}-${env:SERVICE_NAME}"
+
+plugins:
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: provided
+  memorySize: 1024
+  region: ${env:REGION}
+  stage: ${env:STAGE}
+  cfnRole: ${env:CLOUDFORMATION_ROLE_ARN}
+  role: ${env:LAMBDA_EXECUTION_ROLE_ARN}
+  timeout: 60
+  deploymentBucket:
+    name: ${env:KEBOOLA_STACK}-${env:SERVICE_NAME}-deployment
+  stackTags:
+    KeboolaStack: ${env:KEBOOLA_STACK}
+  environment:
+    KEBOOLA_STACK: ${env:KEBOOLA_STACK}
+    REGION: ${env:REGION}
+    SERVICE_NAME: ${env:SERVICE_NAME}
+    STAGE: ${env:STAGE}
+    INTERNAL_API_URL: ${env:INTERNAL_API_URL}
+    STORAGE_API_URL: ${env:STORAGE_API_URL}
+    STORAGE_API_TOKEN: ${env:STORAGE_API_TOKEN}
+    KMS_KEY_ALIAS: ${env:KMS_KEY_ALIAS}
+  endpointType: regional
+  resourcePolicy:
+    - Effect: Allow
+      Principal: "*"
+      Action: execute-api:Invoke
+      Resource: "*"
+  vpc:
+    securityGroupIds:
+      - ${env:VPC_SECURITY_GROUP}
+    subnetIds:
+      - ${env:VPC_SUBNET1}
+      - ${env:VPC_SUBNET2}
+
+custom:
+  cors:
+    origin: '*'
+    headers:
+      - Authorization
+      - Content-Type
+      - X-Amz-Date
+      - X-Amz-Security-Token
+      - X-Amz-User-Agent
+      - X-StorageApi-Token
+    allowCredentials: false
+
+package:
+  individually: true
+  include:
+    - handler.php
+    - src/**
+    - src/lib/**
+    - vendor/**
+  exclude:
+    - .git/**
+    - .idea/**
+    - .codeclimate.yml
+    - .env
+    - .travis.yml
+    - apiary.apib
+    - docker-compose.yml
+    - Dockerfile
+    - LICENSE
+    - README.md
+    - tests/**
+
+functions:
+  jobs:
+    handler: handler.php
+    layers:
+      - ${env:PHP_RUNTIME_LAYER}
+    tags:
+      KeboolaStack: ${env:KEBOOLA_STACK}
+    events:
+      - http:
+          method: get
+          path: "/jobs"
+          cors: ${self:custom.cors}
+      - http:
+          method: post
+          path: "/jobs"
+          cors: ${self:custom.cors}
+      - http:
+          method: get
+          path: "/jobs/{id}"
+          cors: ${self:custom.cors}
+      - http:
+          method: put
+          path: "/jobs/{id}"
+          cors: ${self:custom.cors}
+
+resources:
+  Conditions:
+    isStageProd:
+      Fn::Equals:
+         - ${env:STAGE}
+         - "prod"
+
+  Resources:
