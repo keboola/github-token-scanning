@@ -1,0 +1,82 @@
+version: "3"
+
+services:
+  deploy:
+    build:
+      context: .
+      dockerfile: Dockerfile-deploy
+    working_dir: /var/task
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - REGION
+      - SERVICE_NAME
+      - STAGE=dev
+      - KEBOOLA_STACK
+      - SLS_DEBUG=true
+      - CLOUDFORMATION_ROLE_ARN
+      - LAMBDA_EXECUTION_ROLE_ARN
+      - VPC_SECURITY_GROUP
+      - VPC_SUBNET1
+      - VPC_SUBNET2
+      - VPC_ID
+      - PHP_RUNTIME_LAYER
+      - INTERNAL_API_URL
+      - STORAGE_API_URL
+      - STORAGE_API_TOKEN
+      - KMS_KEY_ALIAS
+    command: serverless deploy --force
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile-tests
+    image: github-token-scanning
+    working_dir: /code
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - REGION
+      - SERVICE_NAME=job-queue-api-tests
+      - STAGE=test
+      - KEBOOLA_STACK=job-queue-api-tests
+      - INTERNAL_API_URL=http://internal-api:3000
+      - STORAGE_API_URL
+      - STORAGE_API_TOKEN
+      - KMS_KEY_ALIAS
+    networks:
+      - default_network
+    command: composer ci
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+    volumes:
+      - .:/code
+    working_dir: /code
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - REGION
+      - SERVICE_NAME=job-queue-api-tests
+      - STAGE=test
+      - KEBOOLA_STACK=job-queue-api-tests
+    networks:
+      - default_network
+    depends_on:
+      - localstack
+    command: composer ci
+
+  localstack:
+    image: localstack/localstack
+    ports:
+      - "4569:4569"
+    environment:
+      - SERVICES=sns,sqs
+      - DEBUG=1
+    networks:
+      - default_network
+
+networks:
+  default_network:

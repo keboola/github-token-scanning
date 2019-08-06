@@ -1,0 +1,306 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Keboola Job Queue API - deployment stack.",
+  "Parameters": {
+    "KeboolaStack": {
+      "Type": "String",
+      "Description": "Keboola Stack identifier",
+      "Default": "kbc-eu-central-1"
+    },
+    "ServiceName": {
+      "Type": "String",
+      "Description": "Service name",
+      "Default": "job-queue-api"
+    },
+    "Stage": {
+      "Type": "String",
+      "Description": "Service stage",
+      "AllowedValues": [
+        "dev",
+        "test",
+        "prod"
+      ]
+    }
+  },
+  "Resources": {
+    "ServerlessDeploymentPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "ManagedPolicyName": { "Fn::Sub": "${KeboolaStack}-${ServiceName}-deploy" },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "cloudformation:CreateStack",
+                "cloudformation:CreateUploadBucket",
+                "cloudformation:DeleteStack",
+                "cloudformation:DescribeStacks",
+                "cloudformation:DescribeStackEvents",
+                "cloudformation:DescribeStackResource",
+                "cloudformation:DescribeStackResources",
+                "cloudformation:ListStackResources",
+                "cloudformation:UpdateStack",
+                "cloudformation:SetStackPolicy"
+              ],
+              "Resource": [
+                { "Fn::Sub": "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${KeboolaStack}-${ServiceName}-${Stage}/*" },
+                { "Fn::Sub": "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${KeboolaStack}-${ServiceName}-${Stage}-*/*" }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "cloudformation:ValidateTemplate"
+              ],
+              "Resource": [
+                "*"
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:*"
+              ],
+              "Resource": [
+                { "Fn::Sub": "arn:aws:s3:::${KeboolaStack}-${ServiceName}-*/*" },
+                { "Fn::Sub": "arn:aws:s3:::${KeboolaStack}-${ServiceName}-*" }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iam:GetRole",
+                "iam:PassRole"
+              ],
+              "Resource": [
+                { "Fn::GetAtt": ["ServerlessCloudformationRole", "Arn"] }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "apigateway:*"
+              ],
+              "Resource": [
+                { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}::/restapis" },
+                { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}::/restapis/*" },
+                { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}::/tags/*" }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "ServerlessCloudformationPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "ManagedPolicyName": { "Fn::Sub": "${KeboolaStack}-${ServiceName}-cf" },
+        "Description": { "Fn::Sub": "${KeboolaStack}-${ServiceName} CloudFormation res" },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iam:GetRole",
+                "iam:PassRole"
+              ],
+              "Resource": [
+                { "Fn::GetAtt": ["ServerlessLambdaExecutionRole", "Arn"] }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion"
+              ],
+              "Resource": [
+                { "Fn::Sub": "arn:aws:s3:::${KeboolaStack}-${ServiceName}-*" },
+                { "Fn::Sub": "arn:aws:s3:::${KeboolaStack}-${ServiceName}-*/*" }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "lambda:*"
+              ],
+              "Resource": [
+                { "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${KeboolaStack}-${ServiceName}-${Stage}-*" },
+                { "Fn::Sub": "arn:aws:lambda:${AWS::Region}:*:layer:*" }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "apigateway:*"
+              ],
+              "Resource": [
+                { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}::/restapis" },
+                { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}::/restapis/*" }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ec2:CreateNetworkInterface",
+                "ec2:DescribeAccountAttributes",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeVpcs",
+                "logs:DescribeLogGroups",
+                "s3:ListAllMyBuckets"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:*"
+              ],
+              "Resource": { "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${KeboolaStack}-${ServiceName}*:*:*" }
+            }
+          ]
+        }
+      }
+    },
+    "ServerlessCloudformationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "cloudformation.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "ManagedPolicyArns": [
+          {
+            "Ref": "ServerlessCloudformationPolicy"
+          }
+        ]
+      }
+    },
+    "ServerlessLambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
+        ],
+        "Policies": [
+          {
+            "PolicyName": { "Fn::Sub": "${ServiceName}-sls-exec" },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DetachNetworkInterface",
+                    "ec2:DeleteNetworkInterface"
+                  ],
+                  "Resource": [
+                    "*"
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": { "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*:*:*" }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey"
+                  ],
+                  "Resource": [
+                    "*"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ServerlessDeploymentGroup": {
+      "Type": "AWS::IAM::Group",
+      "Properties": {
+        "GroupName": { "Fn::Sub": "${KeboolaStack}-${ServiceName}-deploy" },
+        "ManagedPolicyArns": [
+          { "Ref": "ServerlessDeploymentPolicy" }
+        ],
+        "Path": "/"
+      }
+    },
+    "ServerlessDeploymentS3Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": { "Fn::Sub": "${KeboolaStack}-${ServiceName}-deployment" },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "RemovalRule",
+              "Status": "Enabled",
+              "ExpirationInDays": "30"
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "KeboolaStack",
+            "Value": { "Ref": "KeboolaStack" }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessLambdaExecutionRole": {
+      "Value": { "Fn::GetAtt": ["ServerlessLambdaExecutionRole", "Arn"] }
+    },
+    "ServerlessCloudformationRole": {
+      "Value": { "Fn::GetAtt": ["ServerlessCloudformationRole", "Arn"] }
+    }
+  }
+}
